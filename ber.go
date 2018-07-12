@@ -198,7 +198,7 @@ func EncodeInteger(toEncode int) []byte {
 	return result[pos+1 : 8]
 }
 
-// DecodeSequence decodes BER binary data into into *[]interface{}.
+// DecodeSequence decodes BER binary data into *[]interface{}.
 func DecodeSequence(toparse []byte) ([]interface{}, error) {
 	var result []interface{}
 
