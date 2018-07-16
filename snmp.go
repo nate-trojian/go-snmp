@@ -20,6 +20,32 @@ import (
 	"time"
 )
 
+//go:generate stringer -type=SNMPError
+type SNMPError uint8 // SNMPError is the type for standard SNMP errors.
+
+// SNMP Errors
+const (
+	NoError             SNMPError = iota // No error occurred. This code is also used in all request PDUs, since they have no error status to report.
+	TooBig                               // The size of the Response-PDU would be too large to transport.
+	NoSuchName                           // The name of a requested object was not found.
+	BadValue                             // A value in the request didn't match the structure that the recipient of the request had for the object. For example, an object in the request was specified with an incorrect length or type.
+	ReadOnly                             // An attempt was made to set a variable that has an Access value indicating that it is read-only.
+	GenErr                               // An error occurred other than one indicated by a more specific error code in this table.
+	NoAccess                             // Access was denied to the object for security reasons.
+	WrongType                            // The object type in a variable binding is incorrect for the object.
+	WrongLength                          // A variable binding specifies a length incorrect for the object.
+	WrongEncoding                        // A variable binding specifies an encoding incorrect for the object.
+	WrongValue                           // The value given in a variable binding is not possible for the object.
+	NoCreation                           // A specified variable does not exist and cannot be created.
+	InconsistentValue                    // A variable binding specifies a value that could be held by the variable but cannot be assigned to it at this time.
+	ResourceUnavailable                  // An attempt to set a variable required a resource that is not available.
+	CommitFailed                         // An attempt to set a particular variable failed.
+	UndoFailed                           // An attempt to set a particular variable as part of a group of variables failed, and the attempt to then undo the setting of other variables was not successful.
+	AuthorizationError                   // A problem occurred in authorization.
+	NotWritable                          // The variable cannot be written or created.
+	InconsistentName                     // The name in a variable binding specifies a variable that does not exist.
+)
+
 type V3user struct {
 	User    string
 	AuthAlg string //MD5 or SHA1
@@ -185,6 +211,40 @@ func poll(conn net.Conn, toSend []byte, respondBuffer []byte, retries int, timeo
 		return numRead, nil
 	}
 	return 0, err
+}
+
+// Set sends an SNMP set request to change the value associated with an oid.
+func (w WapSNMP) Set(oid Oid, value interface{}) (interface{}, error) {
+	requestID := getRandomRequestID()
+	req, err := EncodeSequence([]interface{}{Sequence, int(w.Version), w.Community,
+		[]interface{}{AsnSetRequest, requestID, 0, 0,
+			[]interface{}{Sequence,
+				[]interface{}{Sequence, oid, value}}}})
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]byte, bufSize, bufSize)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedResponse, err := DecodeSequence(response[:numRead])
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the varbinds out of the packet.
+	respPacket := decodedResponse[3].([]interface{})
+	if err := respPacket[2].(int); err != 0 {
+		return nil, fmt.Errorf("Error in setting snmp value: %s \n", SNMPError(err))
+	}
+
+	varbinds := respPacket[4].([]interface{})
+	result := varbinds[1].([]interface{})[2]
+
+	return result, nil
 }
 
 // Get sends an SNMP get request requesting the value for an oid.
@@ -462,6 +522,96 @@ func (w *WapSNMP) GetNextV3(oid Oid) (*Oid, interface{}, error) {
 func (w *WapSNMP) GetV3(oid Oid) (interface{}, error) {
 	_, val, err := w.doGetV3(oid, AsnGetRequest)
 	return val, err
+}
+
+// A function does both GetNext and Get for SNMP V3
+func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
+	msgID := getRandomRequestID()
+	requestID := getRandomRequestID()
+	req, err := EncodeSequence(
+		[]interface{}{Sequence, w.engineID, "",
+			[]interface{}{AsnSetRequest, requestID, 0, 0,
+				[]interface{}{Sequence,
+					[]interface{}{Sequence, oid, value}}}})
+	if err != nil {
+		panic(err)
+	}
+
+	encrypted, privParam := w.encrypt(string(req))
+
+	v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
+		int(w.engineBoots), int(w.engineTime), w.user, strings.Repeat("\x00", 12), privParam})
+	if err != nil {
+		panic(err)
+	}
+
+	flags := string([]byte{7})
+	USM := 0x03
+	packet, err := EncodeSequence([]interface{}{
+		Sequence, int(w.Version),
+		[]interface{}{Sequence, msgID, maxMsgSize, flags, USM},
+		string(v3Header),
+		encrypted})
+	if err != nil {
+		panic(err)
+	}
+	authParam := w.auth(string(packet))
+	finalPacket := strings.Replace(string(packet), strings.Repeat("\x00", 12), authParam, 1)
+
+	response := make([]byte, bufSize)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, 500*time.Millisecond)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedResponse, err := DecodeSequence(response[:numRead])
+	if err != nil {
+		fmt.Printf("Error decoding setReq:%v\n", err)
+		return nil, err
+	}
+	/*
+		for i, val := range decodedResponse{
+			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
+		}
+	*/
+
+	v3HeaderStr := decodedResponse[3].(string)
+	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
+	if err != nil {
+		fmt.Printf("Error 2 decoding:%v\n", err)
+		return nil, err
+	}
+
+	w.engineID = v3HeaderDecoded[1].(string)
+	w.engineBoots = int32(v3HeaderDecoded[2].(int))
+	w.engineTime = int32(v3HeaderDecoded[3].(int))
+	// skip checking authParam for now
+	respAuthParam := v3HeaderDecoded[5].(string)
+	respPrivParam := v3HeaderDecoded[6].(string)
+
+	if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
+		return nil, fmt.Errorf("Error,response is not encrypted.")
+	}
+
+	encryptedResp := decodedResponse[4].(string)
+	plainResp := w.decrypt(encryptedResp, respPrivParam)
+
+	pduDecoded, err := DecodeSequence([]byte(plainResp))
+	if err != nil {
+		fmt.Printf("Error 3 decoding:%v\n", err)
+		return nil, err
+	}
+
+	// Find the varbinds
+	respPacket := pduDecoded[3].([]interface{})
+	if err := respPacket[2].(int); err != 0 {
+		return nil, fmt.Errorf("Error in setting snmp value: %s \n", SNMPError(err))
+	}
+
+	varbinds := respPacket[4].([]interface{})
+	result := varbinds[1].([]interface{})[2]
+
+	return result, nil
 }
 
 // A function does both GetNext and Get for SNMP V3
