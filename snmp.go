@@ -20,74 +20,6 @@ import (
 	"time"
 )
 
-//go:generate stringer -type=SNMPError
-type SNMPError uint8 // SNMPError is the type for standard SNMP errors.
-
-// SNMP Errors
-const (
-	NoError             SNMPError = iota // No error occurred. This code is also used in all request PDUs, since they have no error status to report.
-	TooBig                               // The size of the Response-PDU would be too large to transport.
-	NoSuchName                           // The name of a requested object was not found.
-	BadValue                             // A value in the request didn't match the structure that the recipient of the request had for the object. For example, an object in the request was specified with an incorrect length or type.
-	ReadOnly                             // An attempt was made to set a variable that has an Access value indicating that it is read-only.
-	GenErr                               // An error occurred other than one indicated by a more specific error code in this table.
-	NoAccess                             // Access was denied to the object for security reasons.
-	WrongType                            // The object type in a variable binding is incorrect for the object.
-	WrongLength                          // A variable binding specifies a length incorrect for the object.
-	WrongEncoding                        // A variable binding specifies an encoding incorrect for the object.
-	WrongValue                           // The value given in a variable binding is not possible for the object.
-	NoCreation                           // A specified variable does not exist and cannot be created.
-	InconsistentValue                    // A variable binding specifies a value that could be held by the variable but cannot be assigned to it at this time.
-	ResourceUnavailable                  // An attempt to set a variable required a resource that is not available.
-	CommitFailed                         // An attempt to set a particular variable failed.
-	UndoFailed                           // An attempt to set a particular variable as part of a group of variables failed, and the attempt to then undo the setting of other variables was not successful.
-	AuthorizationError                   // A problem occurred in authorization.
-	NotWritable                          // The variable cannot be written or created.
-	InconsistentName                     // The name in a variable binding specifies a variable that does not exist.
-)
-
-type V3user struct {
-	User    string
-	AuthAlg string //MD5 or SHA1
-	AuthPwd string
-	PrivAlg string //AES or DES
-	PrivPwd string
-}
-
-// The object type that lets you do SNMP requests.
-type WapSNMP struct {
-	Target    string        // Target device for these SNMP events.
-	Community string        // Community to use to contact the device.
-	Version   SNMPVersion   // SNMPVersion to encode in the packets.
-	timeout   time.Duration // Timeout to use for all SNMP packets.
-	retries   int           // Number of times to retry an operation.
-	conn      net.Conn      // Cache the UDP connection in the object.
-	//SNMP V3 variables
-	user     string
-	authAlg  string //MD5 or SHA1
-	authPwd  string
-	privAlg  string //AES or DES
-	privPwd  string
-	engineID string
-	//V3 temp variables
-	authKey     string
-	privKey     string
-	engineBoots int32
-	engineTime  int32
-	desIV       uint32
-	aesIV       int64
-	Trapusers   []V3user
-}
-
-const (
-	bufSize    int    = 16384
-	maxMsgSize int    = 65500
-	SNMP_AES   string = "AES"
-	SNMP_DES   string = "DES"
-	SNMP_SHA1  string = "SHA1"
-	SNMP_MD5   string = "MD5"
-)
-
 func password_to_key(password string, engineID string, hash_alg string) string {
 	h := sha1.New()
 	if hash_alg == "MD5" {
@@ -116,64 +48,6 @@ func password_to_key(password string, engineID string, hash_alg string) string {
 	//fmt.Printf("localKey=% x\n", localKey)
 
 	return string(localKey)
-}
-
-// NewWapSNMP creates a new WapSNMP object. Opens a udp connection to the device that will be used for the SNMP packets.
-func NewWapSNMP(target, community string, version SNMPVersion, timeout time.Duration, retries int) (*WapSNMP, error) {
-	targetPort := fmt.Sprintf("%s:161", target)
-	conn, err := net.DialTimeout("udp", targetPort, timeout)
-	if err != nil {
-		return nil, fmt.Errorf(`error connecting to ("udp", "%s") : %s`, targetPort, err)
-	}
-	return &WapSNMP{
-		Target:    target,
-		Community: community,
-		Version:   version,
-		timeout:   timeout,
-		retries:   retries,
-		conn:      conn,
-	}, nil
-}
-
-func NewWapSNMPv3(target, user, authAlg, authPwd, privAlg, privPwd string, timeout time.Duration, retries int) (*WapSNMP, error) {
-	if authAlg != SNMP_MD5 && authAlg != SNMP_SHA1 {
-		return nil, fmt.Errorf(`Invalid auth algorithm %s, needs SHA1 or MD5`, authAlg)
-	}
-	if privAlg != SNMP_AES && privAlg != SNMP_DES {
-		return nil, fmt.Errorf(`Invalid priv algorithm %s, needs AES or DES`, privAlg)
-	}
-
-	targetPort := fmt.Sprintf("%s:161", target)
-	conn, err := net.DialTimeout("udp", targetPort, timeout)
-	if err != nil {
-		return nil, fmt.Errorf(`error connecting to ("udp", "%s") : %s`, targetPort, err)
-	}
-	return &WapSNMP{
-		Target:  target,
-		Version: SNMPv3,
-		timeout: timeout,
-		retries: retries,
-		conn:    conn,
-		user:    user,
-		authAlg: authAlg,
-		authPwd: authPwd,
-		privAlg: privAlg,
-		privPwd: privPwd,
-	}, nil
-}
-
-/* NewWapSNMPOnConn creates a new WapSNMP object from an existing net.Conn.
-
-It does not check if the provided target is valid.*/
-func NewWapSNMPOnConn(target, community string, version SNMPVersion, timeout time.Duration, retries int, conn net.Conn) *WapSNMP {
-	return &WapSNMP{
-		Target:    target,
-		Community: community,
-		Version:   version,
-		timeout:   timeout,
-		retries:   retries,
-		conn:      conn,
-	}
 }
 
 // Generate a valid SNMP request ID.
@@ -361,10 +235,17 @@ func (w *WapSNMP) Discover() error {
 	w.engineTime = int32(v3HeaderDecoded[3].(int))
 	w.aesIV = rand.Int63()
 	w.desIV = rand.Uint32()
+
 	//keys
-	w.authKey = w.authPwd //password_to_key(w.authPwd, w.engineID , w.authAlg);
-	//privKey := password_to_key(w.privPwd, w.engineID , w.authAlg);
-	w.privKey = w.privPwd //string(([]byte(privKey))[0:16])
+	if w.AuthKey == "" {
+		w.AuthKey = password_to_key(w.AuthPwd, w.engineID, w.AuthAlg)
+	}
+
+	if w.PrivKey == "" {
+		privKey := password_to_key(w.PrivPwd, w.engineID, w.AuthAlg)
+		w.PrivKey = string(([]byte(privKey))[0:16])
+	}
+
 	return nil
 }
 
@@ -422,14 +303,14 @@ func strXor(s1, s2 string) string {
 
 func (w WapSNMP) auth(wholeMsg string) string {
 	//Auth
-	padLen := 64 - len(w.authKey)
-	eAuthKey := w.authKey + strings.Repeat("\x00", padLen)
+	padLen := 64 - len(w.AuthKey)
+	eAuthKey := w.AuthKey + strings.Repeat("\x00", padLen)
 	ipad := strings.Repeat("\x36", 64)
 	opad := strings.Repeat("\x5C", 64)
 	k1 := strXor(eAuthKey, ipad)
 	k2 := strXor(eAuthKey, opad)
 	h := sha1.New()
-	if w.authAlg == "MD5" {
+	if w.AuthAlg == "MD5" {
 		h = md5.New()
 	}
 	io.WriteString(h, k1+wholeMsg)
@@ -443,7 +324,7 @@ func (w WapSNMP) auth(wholeMsg string) string {
 func (w WapSNMP) encrypt(payload string) (string, string) {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, w.engineBoots)
-	if w.privAlg == SNMP_AES {
+	if w.PrivAlg == SNMP_AES {
 		buf2 := new(bytes.Buffer)
 		binary.Write(buf2, binary.BigEndian, w.engineTime)
 		buf3 := new(bytes.Buffer)
@@ -454,14 +335,14 @@ func (w WapSNMP) encrypt(payload string) (string, string) {
 
 		// AES Encrypt
 		encrypted := make([]byte, len(payload))
-		err := EncryptAESCFB(encrypted, []byte(payload), []byte(w.privKey), []byte(iv))
+		err := EncryptAESCFB(encrypted, []byte(payload), []byte(w.PrivKey), []byte(iv))
 		if err != nil {
 			panic(err)
 		}
 		return string(encrypted), privParam
 	} else {
-		desKey := w.privKey[:8]
-		preIV := w.privKey[8:16]
+		desKey := w.PrivKey[:8]
+		preIV := w.PrivKey[8:16]
 		buf2 := new(bytes.Buffer)
 		w.desIV += 1
 		binary.Write(buf2, binary.BigEndian, w.desIV)
@@ -484,21 +365,21 @@ func (w WapSNMP) decrypt(payload, privParam string) string {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, w.engineBoots)
 
-	if w.privAlg == SNMP_AES {
+	if w.PrivAlg == SNMP_AES {
 		buf2 := new(bytes.Buffer)
 		binary.Write(buf2, binary.BigEndian, w.engineTime)
 		iv := string(buf.Bytes()) + string(buf2.Bytes()) + privParam
 
 		// Decrypt
 		decrypted := make([]byte, len(payload))
-		err := DecryptAESCFB(decrypted, []byte(payload), []byte(w.privKey), []byte(iv))
+		err := DecryptAESCFB(decrypted, []byte(payload), []byte(w.PrivKey), []byte(iv))
 		if err != nil {
 			panic(err)
 		}
 		return string(decrypted)
 	} else {
-		desKey := w.privKey[:8]
-		preIV := w.privKey[8:16]
+		desKey := w.PrivKey[:8]
+		preIV := w.PrivKey[8:16]
 		iv := strXor(preIV, privParam)
 
 		//DES Decrypt
@@ -540,7 +421,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	encrypted, privParam := w.encrypt(string(req))
 
 	v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
-		int(w.engineBoots), int(w.engineTime), w.user, strings.Repeat("\x00", 12), privParam})
+		int(w.engineBoots), int(w.engineTime), w.User, strings.Repeat("\x00", 12), privParam})
 	if err != nil {
 		panic(err)
 	}
@@ -630,7 +511,7 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
 	encrypted, privParam := w.encrypt(string(req))
 
 	v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
-		int(w.engineBoots), int(w.engineTime), w.user, strings.Repeat("\x00", 12), privParam})
+		int(w.engineBoots), int(w.engineTime), w.User, strings.Repeat("\x00", 12), privParam})
 	if err != nil {
 		panic(err)
 	}
@@ -836,10 +717,10 @@ func (w WapSNMP) ParseTrap(response []byte) error {
 		w.engineID = v3HeaderDecoded[1].(string)
 		w.engineBoots = int32(v3HeaderDecoded[2].(int))
 		w.engineTime = int32(v3HeaderDecoded[3].(int))
-		w.user = v3HeaderDecoded[4].(string)
+		w.User = v3HeaderDecoded[4].(string)
 		respAuthParam := v3HeaderDecoded[5].(string)
 		respPrivParam := v3HeaderDecoded[6].(string)
-		fmt.Printf("username=%s\n", w.user)
+		fmt.Printf("username=%s\n", w.User)
 
 		if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
 			return errors.New("response is not encrypted")
@@ -850,11 +731,11 @@ func (w WapSNMP) ParseTrap(response []byte) error {
 
 		founduser := false
 		for _, v3user := range w.Trapusers {
-			if v3user.User == w.user {
-				w.authAlg = v3user.AuthAlg
-				w.privAlg = v3user.PrivAlg
-				w.authPwd = v3user.AuthPwd
-				w.privPwd = v3user.PrivPwd
+			if v3user.User == w.User {
+				w.AuthAlg = v3user.AuthAlg
+				w.PrivAlg = v3user.PrivAlg
+				w.AuthPwd = v3user.AuthPwd
+				w.PrivPwd = v3user.PrivPwd
 				founduser = true
 				break
 			}
@@ -864,9 +745,14 @@ func (w WapSNMP) ParseTrap(response []byte) error {
 		}
 
 		//keys
-		w.authKey = password_to_key(w.authPwd, w.engineID, w.authAlg)
-		privKey := password_to_key(w.privPwd, w.engineID, w.authAlg)
-		w.privKey = string(([]byte(privKey))[0:16])
+		if w.AuthKey == "" {
+			w.AuthKey = password_to_key(w.AuthPwd, w.engineID, w.AuthAlg)
+		}
+
+		if w.PrivKey == "" {
+			privKey := password_to_key(w.PrivPwd, w.engineID, w.AuthAlg)
+			w.PrivKey = string(([]byte(privKey))[0:16])
+		}
 
 		encryptedResp := decodedResponse[4].(string)
 		plainResp := w.decrypt(encryptedResp, respPrivParam)

@@ -3,7 +3,7 @@ WapSnmp : SNMP client for golang
 Currently supported operations:
 * SNMP v1/v2c/v3 trap receiver with V3 EngineID auto discovery
 * SNMP v1/v2c Get, GetMultiple, GetNext, GetBulk, Walk
-* SNMP V3     Get, Walk, GetNext - Takes in authKey and privKey as the localized authentication and encryption keys. Passphrase cannot be passed in.
+* SNMP V3     Get, Set, Walk, GetNext
 
 Compile
 --------------------------------
