@@ -34,7 +34,7 @@ func DoWalkTest(target string) {
 	version := SNMPv2c
 
 	oid := MustParseOid(".1.3.6.1.2.1.1")
-	oid0 := oid;
+	oid0 := oid
 
 	fmt.Printf("Contacting %v %v %v\n", target, community, version)
 	wsnmp, err := NewWapSNMP(target, community, version, 2*time.Second, 5)
@@ -44,43 +44,51 @@ func DoWalkTest(target string) {
 	}
 	defer wsnmp.Close()
 	for {
-		    result_oid, val, err := wsnmp.GetNext(oid)
-		    if err != nil {
-		      fmt.Printf("GetNext error => %v\n", err)
-		      return
-		    }
-		    fmt.Printf("GetNext(%v, %v, %v, %v) => %s, %v\n", target, community, version, oid, result_oid, val)
-		    oid = *result_oid
-			if ! oid.Within(oid0) {
-				break;
-			}
+		result_oid, val, err := wsnmp.GetNext(oid)
+		if err != nil {
+			fmt.Printf("GetNext error => %v\n", err)
+			return
+		}
+		fmt.Printf("GetNext(%v, %v, %v, %v) => %s, %v\n", target, community, version, oid, result_oid, val)
+		oid = *result_oid
+		if !oid.Within(oid0) {
+			break
+		}
 	}
 }
 
-func DoWalkTestV3(target string, oidstr,username, authAlg, authKey, privAlg, privKey string) {
+func DoWalkTestV3(target string, oidstr, username, authAlg, authKey, privAlg, privKey string) {
 	oid := MustParseOid(oidstr)
-	oid0 := oid;
+	oid0 := oid
+	w := &WapSNMP{
+		Target:  target,
+		User:    username,
+		AuthAlg: authAlg,
+		AuthPwd: authKey,
+		PrivAlg: privAlg,
+		PrivPwd: privKey,
+	}
 
 	fmt.Printf("Contacting %v using SNMP v3\n", target)
-	wsnmp, err := NewWapSNMPv3(target,  username, authAlg, authKey, privAlg, privKey, 2*time.Second, 2)
+	wsnmp, err := NewWapSNMPv3(w, 2*time.Second, 2)
 	if err != nil {
 		fmt.Printf("Error creating wsnmp => %v\n", wsnmp)
 		return
 	}
 	defer wsnmp.Close()
-	wsnmp.Discover();
+	wsnmp.Discover()
 	for {
-		    result_oid, val, err := wsnmp.GetNextV3(oid)
-		    if err != nil {
-		      fmt.Printf("GetNext error => %v\n", err)
-		      return
-		    }
-		    fmt.Printf("GetNext(%v, %v) => %s, %v\n", target, oid, result_oid, val)
+		result_oid, val, err := wsnmp.GetNextV3(oid)
+		if err != nil {
+			fmt.Printf("GetNext error => %v\n", err)
+			return
+		}
+		fmt.Printf("GetNext(%v, %v) => %s, %v\n", target, oid, result_oid, val)
 
-		    oid = *result_oid
-			if ! oid.Within(oid0) {
-				break;
-			}
+		oid = *result_oid
+		if !oid.Within(oid0) {
+			break
+		}
 	}
 }
 
@@ -112,23 +120,30 @@ func DoGetTest(target string) {
 	}
 }
 
-func DoGetTestV3(target string, oidstr,username, authAlg, authKey, privAlg, privKey string) {
+func DoGetTestV3(target string, oidstr, username, authAlg, authKey, privAlg, privKey string) {
 	oid := MustParseOid(oidstr)
+	w := &WapSNMP{
+		Target:  target,
+		User:    username,
+		AuthAlg: authAlg,
+		AuthPwd: authKey,
+		PrivAlg: privAlg,
+		PrivPwd: privKey,
+	}
 
 	fmt.Printf("Contacting %v using SNMP v3\n", target)
-	wsnmp, err := NewWapSNMPv3(target,  username, authAlg, authKey, privAlg, privKey, 2*time.Second, 2)
+	wsnmp, err := NewWapSNMPv3(w, 2*time.Second, 2)
 	if err != nil {
 		fmt.Printf("Error creating wsnmp => %v\n", wsnmp)
 		return
 	}
 	defer wsnmp.Close()
-	wsnmp.Discover();
+	wsnmp.Discover()
 
 	val, err := wsnmp.GetV3(oid)
 	if err != nil {
 		fmt.Printf("GetV3 error => %v\n", err)
 		return
 	}
-	fmt.Printf("GetV3(%v) => %v\n", oid , val)
+	fmt.Printf("GetV3(%v) => %v\n", oid, val)
 }
-
