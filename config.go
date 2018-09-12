@@ -37,18 +37,19 @@ type SnmpV3MsgFlags uint8
 
 // Possible values of SnmpV3MsgFlags
 const (
-	NoAuthNoPriv SnmpV3MsgFlags = 0x0 // No authentication, and no privacy
-	AuthNoPriv   SnmpV3MsgFlags = 0x1 // Authentication and no privacy
-	AuthPriv     SnmpV3MsgFlags = 0x3 // Authentication and privacy
-	Reportable   SnmpV3MsgFlags = 0x4 // Report PDU must be sent.
+	NoAuthNoPriv   SnmpV3MsgFlags = 0x0 // No authentication, and no privacy
+	AuthNoPriv     SnmpV3MsgFlags = 0x1 // Authentication and no privacy
+	AuthPriv       SnmpV3MsgFlags = 0x3 // Authentication and privacy
+	Reportable     SnmpV3MsgFlags = 0x4 // Report PDU must be sent.
+	AuthPrivReport SnmpV3MsgFlags = 0x7 //Authentication and privacy + report PDU
 )
 
 // SnmpV3SecurityModel describes the security model used by a SnmpV3 connection
-type SnmpV3SecurityModel uint8
+type SnmpV3SecurityModel int
 
 // UserSecurityModel is the only SnmpV3SecurityModel currently implemented.
 const (
-	UserSecurityModel SnmpV3SecurityModel = 3
+	UserSecurityModel SnmpV3SecurityModel = 0x03
 )
 
 type V3user struct {
@@ -112,7 +113,10 @@ func NewWapSNMP(target, community string, version SNMPVersion, timeout time.Dura
 }
 
 func NewWapSNMPv3(w *WapSNMP, timeout time.Duration, retries int) (*WapSNMP, error) {
-	//TODO Add a check for MessageFlags which decides the level of security
+	if w.MessageFlags != NoAuthNoPriv && w.MessageFlags != AuthPrivReport {
+		return nil, fmt.Errorf(`Currently only NoAuthNoPriv(0x00) and AuthPrivReport(0x07) message flags are implemented`)
+	}
+
 	if w.AuthAlg != SNMP_MD5 && w.AuthAlg != SNMP_SHA1 {
 		return nil, fmt.Errorf(`Invalid auth algorithm %s, needs SHA1 or MD5`, w.AuthAlg)
 	}
@@ -126,18 +130,19 @@ func NewWapSNMPv3(w *WapSNMP, timeout time.Duration, retries int) (*WapSNMP, err
 		return nil, fmt.Errorf(`error connecting to ("udp", "%s") : %s`, targetPort, err)
 	}
 	return &WapSNMP{
-		Target:  w.Target,
-		Version: SNMPv3,
-		timeout: timeout,
-		retries: retries,
-		conn:    conn,
-		User:    w.User,
-		AuthAlg: w.AuthAlg,
-		AuthPwd: w.AuthPwd,
-		AuthKey: w.AuthKey,
-		PrivAlg: w.AuthAlg,
-		PrivPwd: w.PrivPwd,
-		PrivKey: w.PrivKey,
+		Target:       w.Target,
+		Version:      SNMPv3,
+		timeout:      timeout,
+		retries:      retries,
+		conn:         conn,
+		User:         w.User,
+		AuthAlg:      w.AuthAlg,
+		AuthPwd:      w.AuthPwd,
+		AuthKey:      w.AuthKey,
+		PrivAlg:      w.AuthAlg,
+		PrivPwd:      w.PrivPwd,
+		PrivKey:      w.PrivKey,
+		MessageFlags: w.MessageFlags,
 	}, nil
 }
 
