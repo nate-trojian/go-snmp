@@ -405,7 +405,7 @@ func (w *WapSNMP) GetV3(oid Oid) (interface{}, error) {
 	return val, err
 }
 
-// A function does both GetNext and Get for SNMP V3
+// SetV3 sends an SNMP V3 set request to change the value associated with an oid.
 func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	msgID := getRandomRequestID()
 	requestID := getRandomRequestID()
