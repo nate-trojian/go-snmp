@@ -22,7 +22,6 @@ parse BER.
 
 import (
 	"fmt"
-	"time"
 )
 
 // Constants for the Type of the TLV field.
@@ -75,6 +74,10 @@ const (
 	AsnInform         BERType = 0xa6
 	AsnTrap2          BERType = 0xa7
 	AsnReport         BERType = 0xa8
+
+	NoSuchObject   BERType = 0x80
+	NoSuchInstance BERType = 0x81
+	EndOfMibView   BERType = 0x82
 )
 
 // Type to indicate which SNMP version is in use.
@@ -178,6 +181,29 @@ func DecodeIPAddress(toparse []byte) (string, error) {
 	return fmt.Sprintf("%d.%d.%d.%d", toparse[0], toparse[1], toparse[2], toparse[3]), nil
 }
 
+func DecodeTimeticks(toparse []byte) (string, error) {
+	val, err := DecodeInteger(toparse)
+	if err != nil {
+		return "", err
+	}
+	ticks := val
+
+	days := val / 8640000
+	val %= 8640000
+	hours := val / 360000
+	val %= 360000
+	minutes := val / 6000
+	val %= 6000
+	seconds := val / 100
+	val %= 100
+
+	if days > 0 {
+		return fmt.Sprintf("(%d) %02d days %02d:%02d:%02d.%02d", ticks, days, hours, minutes, seconds, val), nil
+	} else {
+		return fmt.Sprintf("(%d) %02d:%02d:%02d.%02d", ticks, hours, minutes, seconds, val), nil
+	}
+}
+
 // EncodeInteger encodes an integer to BER format.
 func EncodeInteger(toEncode int) []byte {
 	if toEncode == 0 {
@@ -269,11 +295,11 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 			result = append(result, val)
 
 		case Timeticks:
-			val, err := DecodeInteger(berValue)
+			val, err := DecodeTimeticks(berValue)
 			if err != nil {
 				return nil, err
 			}
-			result = append(result, time.Duration(val)*10*time.Millisecond)
+			result = append(result, val)
 		case Ipaddress:
 			val, err := DecodeIPAddress(berValue)
 			if err != nil {
@@ -292,6 +318,12 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 				return nil, err
 			}
 			result = append(result, pdu)
+		case NoSuchInstance:
+			return nil, fmt.Errorf("NoSuchInstance")
+		case NoSuchObject:
+			return nil, fmt.Errorf("NoSuchObject")
+		case EndOfMibView:
+			return nil, fmt.Errorf("EndOfMibView")
 		default:
 			return nil, fmt.Errorf("did not understand type %v", berType)
 		}
