@@ -319,11 +319,14 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 			}
 			result = append(result, pdu)
 		case NoSuchInstance:
-			return nil, fmt.Errorf("NoSuchInstance")
+			result = append(result, nil)
+			result = append(result, "NoSuchInstance")
 		case NoSuchObject:
-			return nil, fmt.Errorf("NoSuchObject")
+			result = append(result, nil)
+			result = append(result, "NoSuchObject")
 		case EndOfMibView:
-			return nil, fmt.Errorf("EndOfMibView")
+			result = append(result, nil)
+			result = append(result, "EndOfMibView")
 		default:
 			return nil, fmt.Errorf("did not understand type %v", berType)
 		}

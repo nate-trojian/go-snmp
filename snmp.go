@@ -148,6 +148,10 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 	varbinds := respPacket[4].([]interface{})
 	result := varbinds[1].([]interface{})[2]
 
+	if result == nil {
+		return nil, fmt.Errorf("%v", varbinds[1].([]interface{})[3])
+	}
+
 	return result, nil
 }
 
@@ -185,7 +189,17 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
 		oid := v.([]interface{})[1].(Oid).String()
 		value := v.([]interface{})[2]
-		result[oid] = value
+		if value == nil {
+			result[oid] = map[string]interface{}{
+				"value": nil,
+				"error": v.([]interface{})[3],
+			}
+		} else {
+			result[oid] = map[string]interface{}{
+				"value": value,
+				"error": nil,
+			}
+		}
 	}
 
 	return result, nil
