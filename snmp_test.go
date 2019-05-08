@@ -123,7 +123,7 @@ func TestGet(t *testing.T) {
 		t.Errorf("Error testing to get a value : %v.", err)
 	}
 
-	if val != "(76705700) 08 days 21:04:17.00" {
+	if val != "08 days 21:04:17.00" {
 		t.Errorf("Received wrong value : %v", val)
 	}
 

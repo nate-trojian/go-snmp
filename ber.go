@@ -186,7 +186,7 @@ func DecodeTimeticks(toparse []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ticks := val
+	//ticks := val
 
 	days := val / 8640000
 	val %= 8640000
@@ -198,9 +198,9 @@ func DecodeTimeticks(toparse []byte) (string, error) {
 	val %= 100
 
 	if days > 0 {
-		return fmt.Sprintf("(%d) %02d days %02d:%02d:%02d.%02d", ticks, days, hours, minutes, seconds, val), nil
+		return fmt.Sprintf("%02d days %02d:%02d:%02d.%02d", days, hours, minutes, seconds, val), nil
 	} else {
-		return fmt.Sprintf("(%d) %02d:%02d:%02d.%02d", ticks, hours, minutes, seconds, val), nil
+		return fmt.Sprintf("%02d:%02d:%02d.%02d", hours, minutes, seconds, val), nil
 	}
 }
 

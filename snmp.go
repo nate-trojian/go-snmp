@@ -133,7 +133,7 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 	}
 
 	response := make([]byte, bufSize, bufSize)
-	numRead, err := poll(w.conn, req, response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 	}
 
 	response := make([]byte, bufSize, bufSize)
-	numRead, err := poll(w.conn, req, response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (w *WapSNMP) Discover() error {
 	}
 
 	response := make([]byte, bufSize)
-	numRead, err := poll(w.conn, req, response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	finalPacket := strings.Replace(string(packet), strings.Repeat("\x00", 12), authParam, 1)
 
 	response := make([]byte, bufSize)
-	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -570,7 +570,7 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
 	finalPacket := w.marshalV3(req)
 
 	response := make([]byte, bufSize)
-	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -654,7 +654,7 @@ func (w WapSNMP) GetNext(oid Oid) (*Oid, interface{}, error) {
 	}
 
 	response := make([]byte, bufSize)
-	numRead, err := poll(w.conn, req, response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -690,7 +690,7 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, e
 	}
 
 	response := make([]byte, bufSize, bufSize)
-	numRead, err := poll(w.conn, req, response, w.retries, 500*time.Millisecond)
+	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
 	}
