@@ -280,7 +280,7 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			result = append(result, *oid)
+			result = append(result, oid.String())
 		case Gauge32, Counter32:
 			val, err := DecodeInteger(berValue)
 			if err != nil {

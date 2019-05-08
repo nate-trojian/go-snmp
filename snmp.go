@@ -187,7 +187,7 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 
 	result := make(map[string]interface{})
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
-		oid := v.([]interface{})[1].(Oid).String()
+		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		if value == nil {
 			result[oid] = map[string]interface{}{
