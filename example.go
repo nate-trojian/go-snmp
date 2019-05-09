@@ -50,7 +50,7 @@ func DoWalkTest(target string) {
 			return
 		}
 		fmt.Printf("GetNext(%v, %v, %v, %v) => %s, %v\n", target, community, version, oid, result_oid, val)
-		oid = *result_oid
+		oid = MustParseOid(result_oid)
 		if !oid.Within(oid0) {
 			break
 		}
@@ -85,7 +85,7 @@ func DoWalkTestV3(target string, oidstr, username, authAlg, authKey, privAlg, pr
 		}
 		fmt.Printf("GetNext(%v, %v) => %s, %v\n", target, oid, result_oid, val)
 
-		oid = *result_oid
+		oid = MustParseOid(result_oid)
 		if !oid.Within(oid0) {
 			break
 		}

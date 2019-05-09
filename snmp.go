@@ -409,7 +409,7 @@ func (w WapSNMP) decrypt(payload, privParam string) string {
 }
 
 // GetNext issues a GETNEXT SNMP request.
-func (w *WapSNMP) GetNextV3(oid Oid) (*Oid, interface{}, error) {
+func (w *WapSNMP) GetNextV3(oid Oid) (string, interface{}, error) {
 	return w.doGetV3(oid, AsnGetNextRequest)
 }
 
@@ -559,7 +559,7 @@ func (w *WapSNMP) marshalV3(req []interface{}) string {
 }
 
 // A function does both GetNext and Get for SNMP V3
-func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
+func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error) {
 	requestID := getRandomRequestID()
 	req := []interface{}{Sequence, w.engineID, "",
 		[]interface{}{request, requestID, 0, 0,
@@ -572,13 +572,13 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
 		fmt.Printf("Error decoding getNext:%v\n", err)
-		return nil, nil, err
+		return "", nil, err
 	}
 	/*
 		for i, val := range decodedResponse{
@@ -589,7 +589,7 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
 	pduResponse, err := w.unMarshalV3(decodedResponse)
 	if err != nil {
 		fmt.Printf("Error in unMarshalV3:%v\n", err)
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	// Find the varbinds
@@ -597,10 +597,10 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (*Oid, interface{}, error) {
 	varbinds := respPacket[4].([]interface{})
 	result := varbinds[1].([]interface{})
 
-	resultOid := result[1].(Oid)
+	resultOid := result[1].(string)
 	resultVal := result[2]
 
-	return &resultOid, resultVal, nil
+	return resultOid, resultVal, nil
 }
 
 func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, error) {
@@ -643,25 +643,25 @@ func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, err
 }
 
 // GetNext issues a GETNEXT SNMP request.
-func (w WapSNMP) GetNext(oid Oid) (*Oid, interface{}, error) {
+func (w WapSNMP) GetNext(oid Oid) (string, interface{}, error) {
 	requestID := getRandomRequestID()
 	req, err := EncodeSequence([]interface{}{Sequence, int(w.Version), w.Community,
 		[]interface{}{AsnGetNextRequest, requestID, 0, 0,
 			[]interface{}{Sequence,
 				[]interface{}{Sequence, oid, nil}}}})
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		return nil, nil, err
+		return "", nil, err
 	}
 
 	// Find the varbinds
@@ -669,10 +669,10 @@ func (w WapSNMP) GetNext(oid Oid) (*Oid, interface{}, error) {
 	varbinds := respPacket[4].([]interface{})
 	result := varbinds[1].([]interface{})
 
-	resultOid := result[1].(Oid)
+	resultOid := result[1].(string)
 	resultVal := result[2]
 
-	return &resultOid, resultVal, nil
+	return resultOid, resultVal, nil
 }
 
 /* GetBulk is semantically the same as maxRepetitions getnext requests, but in a single GETBULK SNMP packet.
@@ -706,7 +706,7 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, e
 
 	result := make(map[string]interface{})
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
-		oid := v.([]interface{})[1].(Oid).String()
+		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		result[oid] = value
 	}
