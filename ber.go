@@ -56,14 +56,15 @@ const (
 	UOid        BERType = AsnUniversal | 0x06
 	Sequence    BERType = AsnConstructor | 0x10
 
-	Ipaddress BERType = AsnApplication | 0x00
-	Counter   BERType = AsnApplication | 0x01
-	Counter32 BERType = AsnApplication | 0x01
-	Gauge     BERType = AsnApplication | 0x02
-	Gauge32   BERType = AsnApplication | 0x02
-	Timeticks BERType = AsnApplication | 0x03
-	Opaque    BERType = AsnApplication | 0x04
-	Counter64 BERType = AsnApplication | 0x06
+	Ipaddress  BERType = AsnApplication | 0x00
+	Counter    BERType = AsnApplication | 0x01
+	Counter32  BERType = AsnApplication | 0x01
+	Gauge      BERType = AsnApplication | 0x02
+	Gauge32    BERType = AsnApplication | 0x02
+	Timeticks  BERType = AsnApplication | 0x03
+	Opaque     BERType = AsnApplication | 0x04
+	Counter64  BERType = AsnApplication | 0x06
+	Uinteger32 BERType = AsnApplication | 0x07
 
 	AsnGetRequest     BERType = 0xa0
 	AsnGetNextRequest BERType = 0xa1
@@ -224,6 +225,23 @@ func EncodeInteger(toEncode int) []byte {
 	return result[pos+1 : 8]
 }
 
+// EncodeUInteger32 encodes an Unsigned32 integer to BER format.
+func EncodeUInteger32(toEncode uint32) []byte {
+	if toEncode == 0 {
+		return []byte{0}
+	}
+	result := make([]byte, 4)
+	pos := 3
+	i := toEncode
+	for i > 0 {
+		result[pos] = byte(i % 256)
+		i = i >> 8
+		pos--
+	}
+
+	return result[pos+1 : 4]
+}
+
 // DecodeSequence decodes BER binary data into *[]interface{}.
 func DecodeSequence(toparse []byte) ([]interface{}, error) {
 	var result []interface{}
@@ -360,6 +378,14 @@ func EncodeSequence(toEncode []interface{}) ([]byte, error) {
 			enc := EncodeInteger(val)
 			// TODO encode length ?
 			toEncap = append(toEncap, byte(AsnInteger))
+			toEncap = append(toEncap, byte(len(enc)))
+			for _, b := range enc {
+				toEncap = append(toEncap, b)
+			}
+		case uint32:
+			enc := EncodeUInteger32(val)
+			// TODO encode length ?
+			toEncap = append(toEncap, byte(Uinteger32))
 			toEncap = append(toEncap, byte(len(enc)))
 			for _, b := range enc {
 				toEncap = append(toEncap, b)

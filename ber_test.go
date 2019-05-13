@@ -15,11 +15,11 @@ type LengthTest struct {
 func TestLengthDecodingEncoding(t *testing.T) {
 	tests := []LengthTest{
 		LengthTest{[]byte{0x26}, 38, 1},
-		LengthTest{[]byte{0x82,0x00, 0xc9}, 201, 3},
-		LengthTest{[]byte{0x82,0x00, 0xca}, 202, 3},
-		LengthTest{[]byte{0x82,0x00, 0x9f}, 159, 3},
-		LengthTest{[]byte{0x82,0x01, 0x70}, 368, 3},
-		LengthTest{[]byte{0x82,0x00, 0xe3}, 227, 3},
+		LengthTest{[]byte{0x82, 0x00, 0xc9}, 201, 3},
+		LengthTest{[]byte{0x82, 0x00, 0xca}, 202, 3},
+		LengthTest{[]byte{0x82, 0x00, 0x9f}, 159, 3},
+		LengthTest{[]byte{0x82, 0x01, 0x70}, 368, 3},
+		LengthTest{[]byte{0x82, 0x00, 0xe3}, 227, 3},
 	}
 
 	for _, test := range tests {
@@ -57,6 +57,26 @@ func TestDecodeEncodeInteger(t *testing.T) {
 		}
 		if value != testValue {
 			t.Errorf("Decoding %v gave wrong result. Result => %v Expected => %v", hex.EncodeToString(testEncode), value, testValue)
+			continue
+		}
+	}
+}
+
+func TestEncodeUInteger32(t *testing.T) {
+	tests := map[uint32][]byte{
+		0:          []byte{0x00},
+		3:          []byte{0x03},
+		257:        []byte{0x01, 0x01},
+		65537:      []byte{0x01, 0x00, 0x01},
+		16777217:   []byte{0x01, 0x00, 0x00, 0x01},
+		18542501:   []byte{0x01, 0x1a, 0xef, 0xa5},
+		1191105458: []byte{0x46, 0xfe, 0xd3, 0xb2},
+	}
+
+	for testValue, testEncode := range tests {
+		encode := EncodeUInteger32(testValue)
+		if !reflect.DeepEqual(testEncode, encode) {
+			t.Errorf("Failed to encode %v. EncodeUInteger32 => %v Expected %v", testValue, hex.EncodeToString(encode), hex.EncodeToString(testEncode))
 			continue
 		}
 	}
