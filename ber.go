@@ -412,6 +412,14 @@ func EncodeSequence(toEncode []interface{}) ([]byte, error) {
 			for _, b := range enc {
 				toEncap = append(toEncap, b)
 			}
+		case IPAddress:
+			toEncap = append(toEncap, byte(Ipaddress))
+			for _, b := range EncodeLength(len(val)) {
+				toEncap = append(toEncap, b)
+			}
+			for _, b := range val {
+				toEncap = append(toEncap, b)
+			}
 		case []interface{}:
 			enc, err := EncodeSequence(val)
 			if err != nil {
