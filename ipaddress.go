@@ -13,8 +13,8 @@ import (
 // The SNMP object identifier type.
 type IPAddress []byte
 
-func ParseIPv4(ip string) (IPAddress, error) {
+func ParseIPv4(ip string) IPAddress {
 	ipAddr := net.ParseIP(ip)
 
-	return IPAddress([]byte(ipAddr)[12:]), nil
+	return IPAddress([]byte(ipAddr)[12:])
 }
