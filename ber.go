@@ -21,6 +21,7 @@ parse BER.
 */
 
 import (
+	"encoding/binary"
 	"fmt"
 )
 
@@ -210,6 +211,18 @@ func EncodeInteger(toEncode int) []byte {
 	if toEncode == 0 {
 		return []byte{0}
 	}
+
+	// For negative numbers
+	negativeInteger := make([]byte, 4)
+	if -2147483648 <= toEncode && toEncode < 0 {
+		toEncode = ^toEncode
+		binary.BigEndian.PutUint32(negativeInteger, uint32(toEncode))
+		for k, v := range negativeInteger {
+			negativeInteger[k] = ^v
+		}
+		return negativeInteger
+	}
+
 	result := make([]byte, 8)
 	pos := 7
 	i := toEncode
