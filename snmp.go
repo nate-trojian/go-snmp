@@ -603,6 +603,69 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 	return resultOid, resultVal, nil
 }
 
+// A function that does GetMultiple for SNMP V3
+func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
+	requestID := getRandomRequestID()
+
+	varbinds := []interface{}{Sequence}
+
+	for _, oid := range oids {
+		varbinds = append(varbinds, []interface{}{Sequence, oid, nil})
+	}
+
+	req := []interface{}{Sequence, w.engineID, "",
+		[]interface{}{AsnGetRequest, requestID, 0, 0, varbinds}}
+
+	// Function to apply the right level of security parameters and PDU packet
+	finalPacket := w.marshalV3(req)
+
+	response := make([]byte, bufSize)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedResponse, err := DecodeSequence(response[:numRead])
+	if err != nil {
+		fmt.Printf("Error decoding GetMultipleV3:%v\n", err)
+		return nil, err
+	}
+	/*
+		for i, val := range decodedResponse{
+			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
+		}
+	*/
+
+	pduResponse, err := w.unMarshalV3(decodedResponse)
+	if err != nil {
+		fmt.Printf("Error in unMarshalV3:%v\n", err)
+		return nil, err
+	}
+
+	// Find the varbinds
+	respPacket := pduResponse[3].([]interface{})
+	respVarbinds := respPacket[4].([]interface{})
+
+	result := make(map[string]interface{})
+	for _, v := range respVarbinds[1:] { // First element is just a sequence
+		oid := v.([]interface{})[1].(string)
+		value := v.([]interface{})[2]
+		if value == nil {
+			result[oid] = map[string]interface{}{
+				"value": nil,
+				"error": v.([]interface{})[3],
+			}
+		} else {
+			result[oid] = map[string]interface{}{
+				"value": value,
+				"error": nil,
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, error) {
 	v3HeaderStr := decodedResponse[3].(string)
 	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
