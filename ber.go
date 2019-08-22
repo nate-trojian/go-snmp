@@ -22,6 +22,7 @@ parse BER.
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
@@ -162,6 +163,25 @@ func DecodeCounter64(toparse []byte) (uint64, error) {
 	return val, nil
 }
 
+// parseInt64 treats the given bytes as a big-endian, signed integer and
+// returns the result.
+func parseInt64(bytes []byte) (ret int64, err error) {
+	if len(bytes) > 8 {
+		// We'll overflow an int64 in this case.
+		err = errors.New("integer too large")
+		return
+	}
+	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
+		ret <<= 8
+		ret |= int64(bytes[bytesRead])
+	}
+
+	// Shift up and down in order to sign extend the result.
+	ret <<= 64 - uint8(len(bytes))*8
+	ret >>= 64 - uint8(len(bytes))*8
+	return
+}
+
 /* DecodeInteger decodes an integer.
 
    Will error out if it's longer than 64 bits. */
@@ -297,11 +317,11 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 			}
 			result = append(result, berValue[0] == 0)
 		case AsnInteger:
-			decodedValue, err := DecodeInteger(berValue)
+			ret64, err := parseInt64(berValue)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error in parseInt64:%v", err.Error())
 			}
-			result = append(result, decodedValue)
+			result = append(result, int(ret64))
 		case AsnOctetStr:
 			result = append(result, string(berValue))
 		case AsnNull:

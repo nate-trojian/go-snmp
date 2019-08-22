@@ -55,7 +55,7 @@ func TestDecodeEncodeInteger(t *testing.T) {
 			t.Errorf("Decoding %v failed. Err = %v", hex.EncodeToString(testEncode), err)
 			continue
 		}
-		if value != testValue {
+		if int(value) != testValue {
 			t.Errorf("Decoding %v gave wrong result. Result => %v Expected => %v", hex.EncodeToString(testEncode), value, testValue)
 			continue
 		}
