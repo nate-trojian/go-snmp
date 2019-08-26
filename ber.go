@@ -153,7 +153,7 @@ func DecodeLength(toparse []byte) (int, int, error) {
 
 func DecodeCounter64(toparse []byte) (uint64, error) {
 	if len(toparse) > 8 {
-		return 0, fmt.Errorf("don't support more than 64 bits")
+		return 0, fmt.Errorf("Does not support more than 64 bits")
 	}
 	var val uint64
 	val = 0
@@ -163,12 +163,12 @@ func DecodeCounter64(toparse []byte) (uint64, error) {
 	return val, nil
 }
 
-// parseInt64 treats the given bytes as a big-endian, signed integer and
+// DecodeInt64 treats the given bytes as a big-endian, signed integer and
 // returns the result.
-func parseInt64(bytes []byte) (ret int64, err error) {
+func DecodeInt64(bytes []byte) (ret int64, err error) {
 	if len(bytes) > 8 {
 		// We'll overflow an int64 in this case.
-		err = errors.New("integer too large")
+		err = errors.New("Does not support more than 64 bits")
 		return
 	}
 	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
@@ -182,12 +182,12 @@ func parseInt64(bytes []byte) (ret int64, err error) {
 	return
 }
 
-/* DecodeInteger decodes an integer.
+/* DecodeInteger decodes an integer. This does not handle signed value.
 
    Will error out if it's longer than 64 bits. */
 func DecodeInteger(toparse []byte) (int, error) {
 	if len(toparse) > 8 {
-		return 0, fmt.Errorf("don't support more than 64 bits")
+		return 0, fmt.Errorf("Does not support more than 64 bits")
 	}
 	val := 0
 	for _, b := range toparse {
@@ -317,9 +317,9 @@ func DecodeSequence(toparse []byte) ([]interface{}, error) {
 			}
 			result = append(result, berValue[0] == 0)
 		case AsnInteger:
-			ret64, err := parseInt64(berValue)
+			ret64, err := DecodeInt64(berValue)
 			if err != nil {
-				return nil, fmt.Errorf("error in parseInt64:%v", err.Error())
+				return nil, fmt.Errorf("error in DecodeInt64:%v", err.Error())
 			}
 			result = append(result, int(ret64))
 		case AsnOctetStr:
