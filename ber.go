@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"unicode"
 )
 
 // Constants for the Type of the TLV field.
@@ -118,6 +119,19 @@ func EncodeLength(length int) []byte {
 		result[1+i] = b
 	}
 	return result
+}
+
+/*
+	IsStringAsciiPrintable checks if the given string is ASCII and is
+	printable form. Returns boolean value
+ */
+func IsStringAsciiPrintable(s string) bool {
+	for _, r := range s {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
 }
 
 /* DecodeLength returns the length and the length of the length or an error.
