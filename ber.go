@@ -83,14 +83,20 @@ const (
 	EndOfMibView   BERType = 0x82
 )
 
-// Type to indicate which SNMP version is in use.
-type SNMPVersion uint8
+// PDUType describes which SNMP Protocol Data Unit is being sent.
+type PDUType uint8
 
-// List the supported snmp versions.
 const (
-	SNMPv1  SNMPVersion = 0
-	SNMPv2c SNMPVersion = 1
-	SNMPv3  SNMPVersion = 3
+	PDUSequence    PDUType = 0x30
+	GetRequest     PDUType = 0xa0
+	GetNextRequest PDUType = 0xa1
+	GetResponse    PDUType = 0xa2
+	SetRequest     PDUType = 0xa3
+	Trap           PDUType = 0xa4 // v1
+	GetBulkRequest PDUType = 0xa5
+	InformRequest  PDUType = 0xa6
+	SNMPv2Trap     PDUType = 0xa7 // v2c, v3
+	Report         PDUType = 0xa8
 )
 
 // EncodeLength encodes an integer value as a BER compliant length value.

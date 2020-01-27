@@ -6,6 +6,16 @@ import (
 	"time"
 )
 
+// Type to indicate which SNMP version is in use.
+type SNMPVersion uint8
+
+// List the supported snmp versions.
+const (
+	SNMPv1  SNMPVersion = 0
+	SNMPv2c SNMPVersion = 1
+	SNMPv3  SNMPVersion = 3
+)
+
 //go:generate stringer -type=SNMPError
 type SNMPError uint8 // SNMPError is the type for standard SNMP errors.
 
@@ -84,6 +94,34 @@ type WapSNMP struct {
 	desIV       uint32
 	aesIV       int64
 	Trapusers   []V3user
+}
+
+// PDU will be used when doing SNMP Set's
+// Name is an oid in string format eg ".1.3.6.1.4.9.27"
+type PDU struct {
+	Name  string
+	Type  BERType
+	Value interface{}
+}
+
+// SnmpPacket struct represents the entire SNMP Message or Sequence at the
+// application layer.
+type SnmpPacket struct {
+	Version         SNMPVersion
+	MsgFlags        SnmpV3MsgFlags
+	SecurityModel   SnmpV3SecurityModel
+	ContextEngineID string
+	ContextName     string
+	Community       string
+	PDUType         PDUType
+	MsgID           uint32
+	RequestID       uint32
+	MsgMaxSize      uint32
+	Error           SNMPError
+	ErrorIndex      uint8
+	NonRepeaters    uint8
+	MaxRepetitions  uint8
+	Variables       []PDU
 }
 
 const (
