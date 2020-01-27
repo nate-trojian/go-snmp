@@ -600,6 +600,10 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 	resultOid := result[1].(string)
 	resultVal := result[2]
 
+	// Check if the value is string and printable. To distinguish HEX-String from normal string
+	if res, ok := resultVal.(string); ok && !IsStringAsciiPrintable(resultVal.(string)){
+		return resultOid, fmt.Sprintf("%x", res), nil
+	}
 	return resultOid, resultVal, nil
 }
 
@@ -656,9 +660,17 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 				"error": v.([]interface{})[3],
 			}
 		} else {
-			result[oid] = map[string]interface{}{
-				"value": value,
-				"error": nil,
+			// Check if the value is string and printable. To distinguish HEX-String from normal string
+			if res, ok := value.(string); ok && !IsStringAsciiPrintable(value.(string)){
+				result[oid] = map[string]interface{}{
+					"value": fmt.Sprintf("%x", res),
+					"error": nil,
+				}
+			} else {
+				result[oid] = map[string]interface{}{
+					"value": value,
+					"error": nil,
+				}
 			}
 		}
 	}
