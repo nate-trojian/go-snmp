@@ -78,7 +78,7 @@ func poll(conn net.Conn, toSend []byte, respondBuffer []byte, retries int, timeo
 
 		numRead := 0
 		if numRead, err = conn.Read(respondBuffer); err != nil {
-			log.Printf("Couldn't read. Retrying. Retry %d/%d\n", i, retries)
+			//log.Printf("Couldn't read. Retrying. Retry %d/%d\n", i, retries)
 			continue
 		}
 
