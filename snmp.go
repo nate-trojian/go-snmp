@@ -237,7 +237,13 @@ func (w *WapSNMP) Discover() error {
 		panic(err)
 	}
 
-	v3HeaderStr := decodedResponse[3].(string)
+	// Check v3HeaderStr for it data type
+	v3HeaderStr, ok := decodedResponse[3].(string)
+	if !ok {
+		fmt.Printf("error retrieving v3 Header string for %s, got:%v\n", w.Target, decodedResponse[3])
+		return errors.New("error retrieving v3 header string")
+	}
+
 	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
 	if err != nil {
 		fmt.Printf("Error 2 decoding:%v\n", err)
