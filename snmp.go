@@ -149,7 +149,12 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 	result := varbinds[1].([]interface{})[2]
 
 	if result == nil {
-		return nil, fmt.Errorf("%v", varbinds[1].([]interface{})[3])
+		if len(varbinds[1].([]interface{})) < 3 {
+			fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, varbinds)
+			return nil, errors.New("error retrieving proper varbinds out of the packet")
+		} else {
+			return nil, fmt.Errorf("%v", varbinds[1].([]interface{})[3])
+		}
 	}
 
 	return result, nil
@@ -190,9 +195,14 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		if value == nil {
-			result[oid] = map[string]interface{}{
-				"value": nil,
-				"error": v.([]interface{})[3],
+			if len(v.([]interface{})) < 3 {
+				fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, v)
+				return nil, errors.New("error retrieving proper varbinds out of the packet")
+			} else {
+				result[oid] = map[string]interface{}{
+					"value": nil,
+					"error": v.([]interface{})[3],
+				}
 			}
 		} else {
 			result[oid] = map[string]interface{}{
@@ -661,9 +671,14 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		if value == nil {
-			result[oid] = map[string]interface{}{
-				"value": nil,
-				"error": v.([]interface{})[3],
+			if len(v.([]interface{})) < 3 {
+				fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, v)
+				return nil, errors.New("error retrieving proper varbinds out of the packet")
+			} else {
+				result[oid] = map[string]interface{}{
+					"value": nil,
+					"error": v.([]interface{})[3],
+				}
 			}
 		} else {
 			// Check if the value is string and printable. To distinguish HEX-String from normal string
