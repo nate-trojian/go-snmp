@@ -143,18 +143,21 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 		return nil, err
 	}
 
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in Get() for %v: %v \n", w.Target, r)
+		}
+	}()
+
 	// Fetch the varbinds out of the packet.
 	respPacket := decodedResponse[3].([]interface{})
 	varbinds := respPacket[4].([]interface{})
 	result := varbinds[1].([]interface{})[2]
 
 	if result == nil {
-		if len(varbinds[1].([]interface{})) < 4 {
-			fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, varbinds)
-			return nil, errors.New("error retrieving proper varbinds out of the packet")
-		} else {
-			return nil, fmt.Errorf("%v", varbinds[1].([]interface{})[3])
-		}
+		return nil, fmt.Errorf("%v", varbinds[1].([]interface{})[3])
 	}
 
 	return result, nil
@@ -186,6 +189,14 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 		return nil, err
 	}
 
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in GetMultiple() for %v: %v \n", w.Target, r)
+		}
+	}()
+
 	// Find the varbinds
 	respPacket := decodedResponse[3].([]interface{})
 	respVarbinds := respPacket[4].([]interface{})
@@ -195,14 +206,9 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		if value == nil {
-			if len(v.([]interface{})) < 4 {
-				fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, v)
-				return nil, errors.New("error retrieving proper varbinds out of the packet")
-			} else {
-				result[oid] = map[string]interface{}{
-					"value": nil,
-					"error": v.([]interface{})[3],
-				}
+			result[oid] = map[string]interface{}{
+				"value": nil,
+				"error": v.([]interface{})[3],
 			}
 		} else {
 			result[oid] = map[string]interface{}{
@@ -247,13 +253,15 @@ func (w *WapSNMP) Discover() error {
 		panic(err)
 	}
 
-	// Check v3HeaderStr for it data type
-	v3HeaderStr, ok := decodedResponse[3].(string)
-	if !ok {
-		fmt.Printf("error retrieving v3 Header string for %s, got:%v\n", w.Target, decodedResponse[3])
-		return errors.New("error retrieving v3 header string")
-	}
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in Discover() for %v: %v \n", w.Target, r)
+		}
+	}()
 
+	v3HeaderStr := decodedResponse[3].(string)
 	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
 	if err != nil {
 		fmt.Printf("Error 2 decoding:%v\n", err)
@@ -608,6 +616,14 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 		return "", nil, err
 	}
 
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in doGetV3() for %v: %v \n", w.Target, r)
+		}
+	}()
+
 	// Find the varbinds
 	respPacket := pduResponse[3].([]interface{})
 	varbinds := respPacket[4].([]interface{})
@@ -617,7 +633,7 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 	resultVal := result[2]
 
 	// Check if the value is string and printable. To distinguish HEX-String from normal string
-	if res, ok := resultVal.(string); ok && !IsStringAsciiPrintable(resultVal.(string)){
+	if res, ok := resultVal.(string); ok && !IsStringAsciiPrintable(resultVal.(string)) {
 		return resultOid, fmt.Sprintf("%x", res), nil
 	}
 	return resultOid, resultVal, nil
@@ -662,6 +678,14 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 		return nil, err
 	}
 
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in GetMultipleV3() for %v: %v \n", w.Target, r)
+		}
+	}()
+
 	// Find the varbinds
 	respPacket := pduResponse[3].([]interface{})
 	respVarbinds := respPacket[4].([]interface{})
@@ -671,18 +695,13 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		if value == nil {
-			if len(v.([]interface{})) < 4 {
-				fmt.Printf("error retrieving varbinds for %s, got:%v\n", w.Target, v)
-				return nil, errors.New("error retrieving proper varbinds out of the packet")
-			} else {
-				result[oid] = map[string]interface{}{
-					"value": nil,
-					"error": v.([]interface{})[3],
-				}
+			result[oid] = map[string]interface{}{
+				"value": nil,
+				"error": v.([]interface{})[3],
 			}
 		} else {
 			// Check if the value is string and printable. To distinguish HEX-String from normal string
-			if res, ok := value.(string); ok && !IsStringAsciiPrintable(value.(string)){
+			if res, ok := value.(string); ok && !IsStringAsciiPrintable(value.(string)) {
 				result[oid] = map[string]interface{}{
 					"value": fmt.Sprintf("%x", res),
 					"error": nil,
@@ -760,6 +779,14 @@ func (w WapSNMP) GetNext(oid Oid) (string, interface{}, error) {
 		return "", nil, err
 	}
 
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in GetNext() for %v: %v \n", w.Target, r)
+		}
+	}()
+
 	// Find the varbinds
 	respPacket := decodedResponse[3].([]interface{})
 	varbinds := respPacket[4].([]interface{})
@@ -795,6 +822,14 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, e
 	if err != nil {
 		return nil, err
 	}
+
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in GetBulk() for %v: %v \n", w.Target, r)
+		}
+	}()
 
 	// Find the varbinds
 	respPacket := decodedResponse[3].([]interface{})
