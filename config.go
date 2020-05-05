@@ -114,15 +114,15 @@ func NewWapSNMP(target, community string, version SNMPVersion, timeout time.Dura
 
 func NewWapSNMPv3(w *WapSNMP, timeout time.Duration, retries int) (*WapSNMP, error) {
 	if w.MessageFlags != NoAuthNoPriv && w.MessageFlags != AuthPrivReport {
-		return nil, fmt.Errorf(`Currently only NoAuthNoPriv(0x00) and AuthPrivReport(0x07) message flags are implemented`)
+		return nil, fmt.Errorf(`currently only NoAuthNoPriv(0x00) and AuthPrivReport(0x07) message flags are implemented`)
 	}
 
 	if w.MessageFlags == AuthPrivReport {
 		if w.AuthAlg != SNMP_MD5 && w.AuthAlg != SNMP_SHA1 {
-			return nil, fmt.Errorf(`Invalid auth algorithm %s, needs SHA1 or MD5`, w.AuthAlg)
+			return nil, fmt.Errorf(`invalid auth algorithm %s, needs SHA1 or MD5`, w.AuthAlg)
 		}
 		if w.PrivAlg != SNMP_AES && w.PrivAlg != SNMP_DES {
-			return nil, fmt.Errorf(`Invalid priv algorithm %s, needs AES or DES`, w.PrivAlg)
+			return nil, fmt.Errorf(`invalid priv algorithm %s, needs AES or DES`, w.PrivAlg)
 		}
 	}
 

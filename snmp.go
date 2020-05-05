@@ -20,32 +20,30 @@ import (
 	"time"
 )
 
-func password_to_key(password string, engineID string, hash_alg string) string {
+func passwordToKey(password string, engineID string, hashAlg string) string {
 	h := sha1.New()
-	if hash_alg == "MD5" {
+	if hashAlg == "MD5" {
 		h = md5.New()
 	}
 
 	count := 0
-	plen := len(password)
-	repeat := 1048576 / plen
-	remain := 1048576 % plen
+	pLen := len(password)
+	repeat := 1048576 / pLen
+	remain := 1048576 % pLen
 	for count < repeat {
-		io.WriteString(h, password)
+		_, _ = io.WriteString(h, password)
 		count++
 	}
 	if remain > 0 {
-		io.WriteString(h, string(password[:remain]))
+		_, _ = io.WriteString(h, password[:remain])
 	}
 	ku := string(h.Sum(nil))
-	//fmt.Printf("ku=% x\n", ku)
 
 	h.Reset()
-	io.WriteString(h, ku)
-	io.WriteString(h, engineID)
-	io.WriteString(h, ku)
+	_, _ = io.WriteString(h, ku)
+	_, _ = io.WriteString(h, engineID)
+	_, _ = io.WriteString(h, ku)
 	localKey := h.Sum(nil)
-	//fmt.Printf("localKey=% x\n", localKey)
 
 	return string(localKey)
 }
@@ -143,14 +141,6 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 		return nil, err
 	}
 
-	//This helps in recovering from unknown panic situations in reading the packet data
-	// Mostly errors for missing packet data
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovering from panic in Get() for %v: %v \n", w.Target, r)
-		}
-	}()
-
 	// Fetch the varbinds out of the packet.
 	respPacket := decodedResponse[3].([]interface{})
 	varbinds := respPacket[4].([]interface{})
@@ -188,14 +178,6 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	//This helps in recovering from unknown panic situations in reading the packet data
-	// Mostly errors for missing packet data
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovering from panic in GetMultiple() for %v: %v \n", w.Target, r)
-		}
-	}()
 
 	// Find the varbinds
 	respPacket := decodedResponse[3].([]interface{})
@@ -276,11 +258,11 @@ func (w *WapSNMP) Discover() error {
 
 	//keys
 	if w.AuthKey == "" && w.MessageFlags != NoAuthNoPriv {
-		w.AuthKey = password_to_key(w.AuthPwd, w.engineID, w.AuthAlg)
+		w.AuthKey = passwordToKey(w.AuthPwd, w.engineID, w.AuthAlg)
 	}
 
 	if w.PrivKey == "" && w.MessageFlags != NoAuthNoPriv {
-		privKey := password_to_key(w.PrivPwd, w.engineID, w.AuthAlg)
+		privKey := passwordToKey(w.PrivPwd, w.engineID, w.AuthAlg)
 		w.PrivKey = string(([]byte(privKey))[0:16])
 	}
 
@@ -288,7 +270,7 @@ func (w *WapSNMP) Discover() error {
 }
 
 func EncryptDESCBC(dst, src, key, iv []byte) error {
-	desBlockEncrypter, err := des.NewCipher([]byte(key))
+	desBlockEncrypter, err := des.NewCipher(key)
 	if err != nil {
 		return err
 	}
@@ -298,7 +280,7 @@ func EncryptDESCBC(dst, src, key, iv []byte) error {
 }
 
 func DecryptDESCBC(dst, src, key, iv []byte) error {
-	desBlockEncrypter, err := des.NewCipher([]byte(key))
+	desBlockEncrypter, err := des.NewCipher(key)
 	if err != nil {
 		return err
 	}
@@ -308,7 +290,7 @@ func DecryptDESCBC(dst, src, key, iv []byte) error {
 }
 
 func EncryptAESCFB(dst, src, key, iv []byte) error {
-	aesBlockEncrypter, err := aes.NewCipher([]byte(key))
+	aesBlockEncrypter, err := aes.NewCipher(key)
 	if err != nil {
 		return err
 	}
@@ -318,7 +300,7 @@ func EncryptAESCFB(dst, src, key, iv []byte) error {
 }
 
 func DecryptAESCFB(dst, src, key, iv []byte) error {
-	aesBlockDecrypter, err := aes.NewCipher([]byte(key))
+	aesBlockDecrypter, err := aes.NewCipher(key)
 	if err != nil {
 		return nil
 	}
@@ -351,23 +333,23 @@ func (w WapSNMP) auth(wholeMsg string) string {
 	if w.AuthAlg == "MD5" {
 		h = md5.New()
 	}
-	io.WriteString(h, k1+wholeMsg)
+	_, _ = io.WriteString(h, k1+wholeMsg)
 	tmp1 := string(h.Sum(nil))
 	h.Reset()
-	io.WriteString(h, k2+tmp1)
+	_, _ = io.WriteString(h, k2+tmp1)
 	msgAuthParam := string(h.Sum(nil)[:12])
 	return msgAuthParam
 }
 
 func (w WapSNMP) encrypt(payload string) (string, string) {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, w.engineBoots)
+	_ = binary.Write(buf, binary.BigEndian, w.engineBoots)
 	if w.PrivAlg == SNMP_AES {
 		buf2 := new(bytes.Buffer)
-		binary.Write(buf2, binary.BigEndian, w.engineTime)
+		_ = binary.Write(buf2, binary.BigEndian, w.engineTime)
 		buf3 := new(bytes.Buffer)
 		w.aesIV += 1
-		binary.Write(buf3, binary.BigEndian, w.aesIV)
+		_ = binary.Write(buf3, binary.BigEndian, w.aesIV)
 		privParam := string(buf3.Bytes())
 		iv := string(buf.Bytes()) + string(buf2.Bytes()) + privParam
 
@@ -383,7 +365,7 @@ func (w WapSNMP) encrypt(payload string) (string, string) {
 		preIV := w.PrivKey[8:16]
 		buf2 := new(bytes.Buffer)
 		w.desIV += 1
-		binary.Write(buf2, binary.BigEndian, w.desIV)
+		_ = binary.Write(buf2, binary.BigEndian, w.desIV)
 		privParam := string(buf.Bytes()) + string(buf2.Bytes())
 		iv := strXor(preIV, privParam)
 
@@ -394,40 +376,40 @@ func (w WapSNMP) encrypt(payload string) (string, string) {
 			payload = payload + strings.Repeat("\x00", 8-(plen%8))
 		}
 		encrypted := make([]byte, len(payload))
-		EncryptDESCBC(encrypted, []byte(payload), []byte(desKey), []byte(iv))
+		_ = EncryptDESCBC(encrypted, []byte(payload), []byte(desKey), []byte(iv))
 		return string(encrypted), privParam
 	}
 }
 
-func (w WapSNMP) decrypt(payload, privParam string) string {
+func (w WapSNMP) decrypt(payload, privParam string) (string, error) {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, w.engineBoots)
+	_ = binary.Write(buf, binary.BigEndian, w.engineBoots)
 
 	if w.PrivAlg == SNMP_AES {
 		buf2 := new(bytes.Buffer)
-		binary.Write(buf2, binary.BigEndian, w.engineTime)
+		_ = binary.Write(buf2, binary.BigEndian, w.engineTime)
 		iv := string(buf.Bytes()) + string(buf2.Bytes()) + privParam
 
 		// Decrypt
 		decrypted := make([]byte, len(payload))
 		err := DecryptAESCFB(decrypted, []byte(payload), []byte(w.PrivKey), []byte(iv))
 		if err != nil {
-			panic(err)
+			return "", err
 		}
-		return string(decrypted)
+		return string(decrypted), nil
 	} else {
 		desKey := w.PrivKey[:8]
 		preIV := w.PrivKey[8:16]
 		iv := strXor(preIV, privParam)
 
 		//DES Decrypt
-		plen := len(payload)
-		if (plen % 8) != 0 {
-			panic("DES encrypted payload is not multiple of 8 bytes\n")
+		pLen := len(payload)
+		if (pLen % 8) != 0 {
+			return "", errors.New("DES encrypted payload is not multiple of 8 bytes")
 		}
 		decrypted := make([]byte, len(payload))
-		DecryptDESCBC(decrypted, []byte(payload), []byte(desKey), []byte(iv))
-		return string(decrypted)
+		_ = DecryptDESCBC(decrypted, []byte(payload), []byte(desKey), []byte(iv))
+		return string(decrypted), nil
 	}
 
 }
@@ -453,7 +435,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 				[]interface{}{Sequence,
 					[]interface{}{Sequence, oid, value}}}})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error creating sequence: %w", err)
 	}
 
 	encrypted, privParam := w.encrypt(string(req))
@@ -461,7 +443,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
 		int(w.engineBoots), int(w.engineTime), w.User, strings.Repeat("\x00", 12), privParam})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error creating v3 header: %w", err)
 	}
 
 	flags := string([]byte{7})
@@ -472,7 +454,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 		string(v3Header),
 		encrypted})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error assembling packet: %w", err)
 	}
 	authParam := w.auth(string(packet))
 	finalPacket := strings.Replace(string(packet), strings.Repeat("\x00", 12), authParam, 1)
@@ -480,25 +462,18 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error with request: %w", err)
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		fmt.Printf("Error decoding setReq:%v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error decoding request: %w", err)
 	}
-	/*
-		for i, val := range decodedResponse{
-			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
-		}
-	*/
 
 	v3HeaderStr := decodedResponse[3].(string)
 	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
 	if err != nil {
-		fmt.Printf("Error 2 decoding:%v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error decoding header: %w", err)
 	}
 
 	w.engineID = v3HeaderDecoded[1].(string)
@@ -509,22 +484,24 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	respPrivParam := v3HeaderDecoded[6].(string)
 
 	if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
-		return nil, fmt.Errorf("Error,response is not encrypted.")
+		return nil, fmt.Errorf("response is not encrypted")
 	}
 
 	encryptedResp := decodedResponse[4].(string)
-	plainResp := w.decrypt(encryptedResp, respPrivParam)
+	plainResp, err := w.decrypt(encryptedResp, respPrivParam)
+	if err != nil {
+		return nil, fmt.Errorf("error decrypt response: %w", err)
+	}
 
 	pduDecoded, err := DecodeSequence([]byte(plainResp))
 	if err != nil {
-		fmt.Printf("Error 3 decoding:%v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error decoding pdu: %w", err)
 	}
 
 	// Find the varbinds
 	respPacket := pduDecoded[3].([]interface{})
 	if err := respPacket[2].(int); err != 0 {
-		return nil, fmt.Errorf("Error in setting snmp value: %s \n", SNMPError(err))
+		return nil, fmt.Errorf("error in setting snmp value: %s", SNMPError(err))
 	}
 
 	varbinds := respPacket[4].([]interface{})
@@ -533,14 +510,109 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	return result, nil
 }
 
-func (w *WapSNMP) marshalV3(req []interface{}) string {
+// SetMultipleV3 packages multiple SNMP set requests together in a single call
+func (w *WapSNMP) SetMultipleV3(oidList map[string]interface{}) (map[string]interface{}, error) {
+	msgID := getRandomRequestID()
+	requestID := getRandomRequestID()
+
+	oids := []interface{}{Sequence}
+	for oid, value := range oidList {
+		oids = append(oids, []interface{}{Sequence, oid, value})
+	}
+
+	req, err := EncodeSequence(
+		[]interface{}{Sequence, w.engineID, "",
+			[]interface{}{AsnSetRequest, requestID, 0, 0, oids}})
+	if err != nil {
+		return nil, fmt.Errorf("error creating sequence: %w", err)
+	}
+
+	encrypted, privParam := w.encrypt(string(req))
+
+	v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
+		int(w.engineBoots), int(w.engineTime), w.User, strings.Repeat("\x00", 12), privParam})
+	if err != nil {
+		return nil, fmt.Errorf("error creating v3 header: %w", err)
+	}
+
+	flags := string([]byte{7})
+	USM := 0x03
+	packet, err := EncodeSequence([]interface{}{
+		Sequence, int(w.Version),
+		[]interface{}{Sequence, msgID, maxMsgSize, flags, USM},
+		string(v3Header),
+		encrypted})
+	if err != nil {
+		return nil, fmt.Errorf("error assembling packet: %w", err)
+	}
+	authParam := w.auth(string(packet))
+	finalPacket := strings.Replace(string(packet), strings.Repeat("\x00", 12), authParam, 1)
+
+	response := make([]byte, bufSize)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
+	if err != nil {
+		return nil, fmt.Errorf("error with request: %w", err)
+	}
+
+	decodedResponse, err := DecodeSequence(response[:numRead])
+	if err != nil {
+		return nil, fmt.Errorf("error decoding request: %w", err)
+	}
+
+	v3HeaderStr := decodedResponse[3].(string)
+	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding header: %w", err)
+	}
+
+	w.engineID = v3HeaderDecoded[1].(string)
+	w.engineBoots = int32(v3HeaderDecoded[2].(int))
+	w.engineTime = int32(v3HeaderDecoded[3].(int))
+	// skip checking authParam for now
+	respAuthParam := v3HeaderDecoded[5].(string)
+	respPrivParam := v3HeaderDecoded[6].(string)
+
+	if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
+		return nil, fmt.Errorf("response is not encrypted")
+	}
+
+	encryptedResp := decodedResponse[4].(string)
+	plainResp, err := w.decrypt(encryptedResp, respPrivParam)
+	if err != nil {
+		return nil, fmt.Errorf("error decrypt response: %w", err)
+	}
+
+	pduDecoded, err := DecodeSequence([]byte(plainResp))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding pdu: %w", err)
+	}
+
+	// Check if sets failed
+	respPacket := pduDecoded[3].([]interface{})
+	if err := respPacket[2].(int); err != int(NoError) {
+		return nil, fmt.Errorf("error in setting snmp value: %w", errors.New(SNMPError(err).String()))
+	}
+
+	result := make(map[string]interface{})
+	varbinds := respPacket[4].([]interface{})
+	for _, v := range varbinds[1:] {
+		o := v.([]interface{})[1].(Oid).String()
+		value := v.([]interface{})[2]
+		result[o] = value
+	}
+
+	return result, nil
+}
+
+func (w *WapSNMP) marshalV3(req []interface{}) (string, error) {
 	var finalPacket string
 	msgID := getRandomRequestID()
 	flags := w.MessageFlags
 
 	header := []interface{}{Sequence, msgID, maxMsgSize, string(flags), int(UserSecurityModel)}
 
-	if flags == NoAuthNoPriv {
+	switch flags {
+	case NoAuthNoPriv:
 		v3Header, _ := EncodeSequence([]interface{}{Sequence, w.engineID,
 			int(w.engineBoots), int(w.engineTime), w.User, "", ""})
 
@@ -548,15 +620,14 @@ func (w *WapSNMP) marshalV3(req []interface{}) string {
 			Sequence, int(w.Version), header,
 			string(v3Header), req})
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		finalPacket = string(packet)
-
-	} else { //AuthPrivReport case
+	case AuthPrivReport:
 		reqEncoded, err := EncodeSequence(req)
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		encrypted, privParam := w.encrypt(string(reqEncoded))
@@ -564,7 +635,7 @@ func (w *WapSNMP) marshalV3(req []interface{}) string {
 		v3Header, err := EncodeSequence([]interface{}{Sequence, w.engineID,
 			int(w.engineBoots), int(w.engineTime), w.User, strings.Repeat("\x00", 12), privParam})
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		packet, err := EncodeSequence([]interface{}{
@@ -572,14 +643,16 @@ func (w *WapSNMP) marshalV3(req []interface{}) string {
 			string(v3Header),
 			encrypted})
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 
 		authParam := w.auth(string(packet))
 		finalPacket = strings.Replace(string(packet), strings.Repeat("\x00", 12), authParam, 1)
+	default:
+		return "", fmt.Errorf("incorrect message flag: %s", string(flags))
 	}
 
-	return finalPacket
+	return finalPacket, nil
 }
 
 // A function does both GetNext and Get for SNMP V3
@@ -591,7 +664,10 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 				[]interface{}{Sequence, oid, nil}}}}
 
 	// Function to apply the right level of security parameters and PDU packet
-	finalPacket := w.marshalV3(req)
+	finalPacket, err := w.marshalV3(req)
+	if err != nil {
+		return "", nil, err
+	}
 
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
@@ -601,28 +677,13 @@ func (w *WapSNMP) doGetV3(oid Oid, request BERType) (string, interface{}, error)
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		fmt.Printf("Error decoding getNext:%v\n", err)
 		return "", nil, err
 	}
-	/*
-		for i, val := range decodedResponse{
-			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
-		}
-	*/
 
 	pduResponse, err := w.unMarshalV3(decodedResponse)
 	if err != nil {
-		fmt.Printf("Error in unMarshalV3:%v\n", err)
 		return "", nil, err
 	}
-
-	//This helps in recovering from unknown panic situations in reading the packet data
-	// Mostly errors for missing packet data
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovering from panic in doGetV3() for %v: %v \n", w.Target, r)
-		}
-	}()
 
 	// Find the varbinds
 	respPacket := pduResponse[3].([]interface{})
@@ -653,7 +714,10 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 		[]interface{}{AsnGetRequest, requestID, 0, 0, varbinds}}
 
 	// Function to apply the right level of security parameters and PDU packet
-	finalPacket := w.marshalV3(req)
+	finalPacket, err := w.marshalV3(req)
+	if err != nil {
+		return nil, err
+	}
 
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
@@ -663,28 +727,13 @@ func (w *WapSNMP) GetMultipleV3(oids []Oid) (map[string]interface{}, error) {
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		fmt.Printf("Error decoding GetMultipleV3:%v\n", err)
 		return nil, err
 	}
-	/*
-		for i, val := range decodedResponse{
-			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
-		}
-	*/
 
 	pduResponse, err := w.unMarshalV3(decodedResponse)
 	if err != nil {
-		fmt.Printf("Error in unMarshalV3:%v\n", err)
 		return nil, err
 	}
-
-	//This helps in recovering from unknown panic situations in reading the packet data
-	// Mostly errors for missing packet data
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovering from panic in GetMultipleV3() for %v: %v \n", w.Target, r)
-		}
-	}()
 
 	// Find the varbinds
 	respPacket := pduResponse[3].([]interface{})
@@ -722,7 +771,6 @@ func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, err
 	v3HeaderStr := decodedResponse[3].(string)
 	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
 	if err != nil {
-		fmt.Printf("Error 2 decoding:%v\n", err)
 		return nil, err
 	}
 
@@ -734,22 +782,19 @@ func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, err
 	respPrivParam := v3HeaderDecoded[6].(string)
 
 	if (len(respAuthParam) == 0 || len(respPrivParam) == 0) && w.MessageFlags == AuthPrivReport {
-		return nil, fmt.Errorf("Error,response is not encrypted.")
+		return nil, fmt.Errorf("response is not encrypted")
 	}
 	var pduResponse []interface{}
 
 	if w.MessageFlags == AuthPrivReport {
 		encryptedResp := decodedResponse[4].(string)
-		plainResp := w.decrypt(encryptedResp, respPrivParam)
+		plainResp, err := w.decrypt(encryptedResp, respPrivParam)
 
 		pduDecoded, err := DecodeSequence([]byte(plainResp))
 		if err != nil {
-			fmt.Printf("Error 3 decoding:%v\n", err)
 			return nil, err
 		}
-
 		pduResponse = pduDecoded
-
 	} else {
 		pduResponse = decodedResponse[4].([]interface{})
 	}
@@ -798,10 +843,11 @@ func (w WapSNMP) GetNext(oid Oid) (string, interface{}, error) {
 	return resultOid, resultVal, nil
 }
 
-/* GetBulk is semantically the same as maxRepetitions getnext requests, but in a single GETBULK SNMP packet.
-
+/*
+   GetBulk is semantically the same as maxRepetitions getnext requests, but in a single GETBULK SNMP packet.
    Caveat: many devices will silently drop GETBULK requests for more than some number of maxrepetitions, if
-   it doesn't work, try with a lower value and/or use GetTable. */
+   it doesn't work, try with a lower value and/or use GetTable.
+*/
 func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, error) {
 	requestID := getRandomRequestID()
 	req, err := EncodeSequence([]interface{}{Sequence, int(w.Version), w.Community,
@@ -823,14 +869,6 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, e
 		return nil, err
 	}
 
-	//This helps in recovering from unknown panic situations in reading the packet data
-	// Mostly errors for missing packet data
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovering from panic in GetBulk() for %v: %v \n", w.Target, r)
-		}
-	}()
-
 	// Find the varbinds
 	respPacket := decodedResponse[3].([]interface{})
 	respVarbinds := respPacket[4].([]interface{})
@@ -850,10 +888,9 @@ func (w WapSNMP) GetTable(oid Oid) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	lastOid := oid.Copy()
 	for lastOid.Within(oid) {
-		log.Printf("Sending GETBULK(%v, 50)\n", lastOid)
 		results, err := w.GetBulk(lastOid, 50)
 		if err != nil {
-			return nil, fmt.Errorf("received GetBulk error => %v\n", err)
+			return nil, fmt.Errorf("received GetBulk error => %w", err)
 		}
 		newLastOid := lastOid.Copy()
 		for o, v := range results {
@@ -873,107 +910,90 @@ func (w WapSNMP) GetTable(oid Oid) (map[string]interface{}, error) {
 	return result, nil
 }
 
-// ParseTrap parses a received SNMP trap and returns  a map of oid to objects
-func (w WapSNMP) ParseTrap(response []byte) error {
+// ParseTrap parses a received SNMP trap and returns a map of oid to objects
+func (w WapSNMP) ParseTrap(response []byte) (map[string]interface{}, error) {
 	decodedResponse, err := DecodeSequence(response)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var community string
 
 	// Fetch the varbinds out of the packet.
 	snmpVer := decodedResponse[1].(int)
-	if snmpVer <= 1 {
-		snmpVer++
+	v3HeaderStr := decodedResponse[3].(string)
+	v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
+	if err != nil {
+		fmt.Printf("Error 2 decoding:%v\n", err)
+		return nil, err
 	}
-	fmt.Printf("Version:%d\n", snmpVer)
-	if snmpVer < 3 {
-		community = decodedResponse[2].(string)
-		fmt.Printf("Community:%s\n", community)
-	} else {
-		/*
-			for i, val := range decodedResponse{
-				fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
-			}
-		*/
-		v3HeaderStr := decodedResponse[3].(string)
-		v3HeaderDecoded, err := DecodeSequence([]byte(v3HeaderStr))
-		if err != nil {
-			fmt.Printf("Error 2 decoding:%v\n", err)
-			return err
-		}
 
-		w.engineID = v3HeaderDecoded[1].(string)
-		w.engineBoots = int32(v3HeaderDecoded[2].(int))
-		w.engineTime = int32(v3HeaderDecoded[3].(int))
-		w.User = v3HeaderDecoded[4].(string)
-		respAuthParam := v3HeaderDecoded[5].(string)
-		respPrivParam := v3HeaderDecoded[6].(string)
-		fmt.Printf("username=%s\n", w.User)
+	w.engineID = v3HeaderDecoded[1].(string)
+	w.engineBoots = int32(v3HeaderDecoded[2].(int))
+	w.engineTime = int32(v3HeaderDecoded[3].(int))
+	w.User = v3HeaderDecoded[4].(string)
+	respAuthParam := v3HeaderDecoded[5].(string)
+	respPrivParam := v3HeaderDecoded[6].(string)
 
-		if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
-			return errors.New("response is not encrypted")
-		}
-		if len(w.Trapusers) == 0 {
-			return errors.New("No SNMP V3 trap user configured")
-		}
-
-		founduser := false
-		for _, v3user := range w.Trapusers {
-			if v3user.User == w.User {
-				w.AuthAlg = v3user.AuthAlg
-				w.PrivAlg = v3user.PrivAlg
-				w.AuthPwd = v3user.AuthPwd
-				w.PrivPwd = v3user.PrivPwd
-				founduser = true
-				break
-			}
-		}
-		if !founduser {
-			return errors.New("No matching user found")
-		}
-
-		//keys
-		if w.AuthKey == "" {
-			w.AuthKey = password_to_key(w.AuthPwd, w.engineID, w.AuthAlg)
-		}
-
-		if w.PrivKey == "" {
-			privKey := password_to_key(w.PrivPwd, w.engineID, w.AuthAlg)
-			w.PrivKey = string(([]byte(privKey))[0:16])
-		}
-
-		encryptedResp := decodedResponse[4].(string)
-		plainResp := w.decrypt(encryptedResp, respPrivParam)
-
-		pduDecoded, err := DecodeSequence([]byte(plainResp))
-		if err != nil {
-			fmt.Printf("Error 3 decoding:%v\n", err)
-			return err
-		}
-		decodedResponse = pduDecoded
+	if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
+		return nil, errors.New("response is not encrypted")
 	}
-	//fmt.Printf("%#v\n",decodedResponse);
+	if len(w.Trapusers) == 0 {
+		return nil, errors.New("no SNMP V3 trap user configured")
+	}
+
+	foundUser := false
+	for _, v3user := range w.Trapusers {
+		if v3user.User == w.User {
+			w.AuthAlg = v3user.AuthAlg
+			w.PrivAlg = v3user.PrivAlg
+			w.AuthPwd = v3user.AuthPwd
+			w.PrivPwd = v3user.PrivPwd
+			foundUser = true
+			break
+		}
+	}
+	if !foundUser {
+		return nil, errors.New("no matching user found")
+	}
+
+	//keys
+	if w.AuthKey == "" {
+		w.AuthKey = passwordToKey(w.AuthPwd, w.engineID, w.AuthAlg)
+	}
+
+	if w.PrivKey == "" {
+		privKey := passwordToKey(w.PrivPwd, w.engineID, w.AuthAlg)
+		w.PrivKey = string(([]byte(privKey))[0:16])
+	}
+
+	encryptedResp := decodedResponse[4].(string)
+	plainResp, err := w.decrypt(encryptedResp, respPrivParam)
+	if err != nil {
+
+	}
+
+	pduDecoded, err := DecodeSequence([]byte(plainResp))
+	if err != nil {
+		return nil, err
+	}
+	decodedResponse = pduDecoded
 
 	respPacket := decodedResponse[3].([]interface{})
 	var varbinds []interface{}
 	if snmpVer == 1 {
-		fmt.Printf("OID: %s\n", respPacket[1])
-		fmt.Printf("Agent Address: %s\n", respPacket[2])
-		fmt.Printf("Generic Trap: %d\n", respPacket[3])
 		varbinds = respPacket[6].([]interface{})
 	} else {
 		varbinds = respPacket[4].([]interface{})
 	}
 
+	result := make(map[string]interface{})
 	for i := 1; i < len(varbinds); i++ {
-		varoid := varbinds[i].([]interface{})[1]
-		result := varbinds[i].([]interface{})[2]
-		fmt.Printf("%s = %s\n", varoid, result)
+		oid := varbinds[i].([]interface{})[1].(Oid).String()
+		val := varbinds[i].([]interface{})[2]
+		result[oid] = val
 	}
 	fmt.Printf("\n")
 
-	return nil
+	return result, nil
 }
 
 // Close the net.conn in WapSNMP.

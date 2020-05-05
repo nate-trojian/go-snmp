@@ -1,3 +1,3 @@
-module github.com/merinjo/go-snmp
+module github.com/nate-trojian/go-snmp
 
-go 1.12
+go 1.14
